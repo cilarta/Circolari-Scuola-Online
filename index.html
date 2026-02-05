@@ -17,21 +17,45 @@
         .admin-btn { background-color: #6c757d; margin-top: 10px; font-size: 0.8em; }
 
         /* Lista Circolari */
-        .circolare { border-bottom: 1px solid #eee; padding: 15px 0; }
-        .circolare-text { font-size: 1.1em; margin-bottom: 10px; display: block; font-weight: bold; }
+        .circolare { border-bottom: 1px solid #eee; padding: 15px 0; position: relative; }
+        .circolare-content { font-size: 1.1em; margin-bottom: 10px; display: block; margin-top: 5px; }
         .meta-info { font-size: 0.8em; color: #888; margin-bottom: 5px; }
         
         /* Checkbox */
-        .check-container { display: flex; align-items: center; cursor: pointer; }
+        .check-container { display: flex; align-items: center; cursor: pointer; margin-top: 10px;}
         .check-container input { margin-right: 10px; transform: scale(1.5); }
         .read-confirm { color: green; font-weight: bold; display: none; margin-left: 10px;}
         input:checked ~ .read-confirm { display: inline; }
 
-        /* Admin Panel */
+        /* Admin Panel & Editor */
         #admin-panel { border: 2px solid #dc3545; padding: 15px; margin-bottom: 20px; background-color: #fff8f8; display: none; }
         #admin-panel h3 { color: #dc3545; margin-top: 0; }
-        textarea { width: 100%; height: 80px; padding: 10px; margin-bottom: 10px; }
+        
+        /* Editor Visuale Stile */
+        .toolbar { background: #eee; padding: 5px; border: 1px solid #ccc; border-bottom: none; display: flex; gap: 5px; }
+        .toolbar button { padding: 5px 10px; background: white; border: 1px solid #999; color: black; font-weight: bold; cursor: pointer; }
+        .toolbar button:hover { background: #ddd; }
+        #editor { 
+            width: 100%; 
+            min-height: 100px; 
+            padding: 10px; 
+            border: 1px solid #ccc; 
+            background: white; 
+            margin-bottom: 10px; 
+            box-sizing: border-box; /* Importante per i bordi */
+            overflow-y: auto;
+        }
+
         .reader-list { font-size: 0.8em; color: #555; background: #eee; padding: 10px; margin-top: 5px; border-radius: 4px; }
+        
+        /* Bottone Elimina */
+        .delete-btn {
+            background-color: #dc3545; 
+            font-size: 0.8em; 
+            padding: 5px 10px; 
+            margin-left: 10px;
+        }
+        
         .hidden { display: none; }
     </style>
 </head>
@@ -65,9 +89,21 @@
         <hr>
 
         <div id="admin-panel">
-            <h3>🛠 Aggiungi Nuova Circolare</h3>
-            <textarea id="newCircolareText" placeholder="Scrivi qui il testo della circolare..."></textarea>
-            <button onclick="addCircolare()">Pubblica Circolare</button>
+            <h3>🛠 Scrivi Nuova Circolare</h3>
+            
+            <div class="toolbar">
+                <button onclick="formatDoc('bold')" title="Grassetto">B</button>
+                <button onclick="formatDoc('italic')" title="Corsivo">I</button>
+                <button onclick="formatDoc('underline')" title="Sottolineato">U</button>
+                <button onclick="formatDoc('foreColor', 'red')" style="color:red">A</button>
+                <button onclick="formatDoc('foreColor', 'blue')" style="color:blue">A</button>
+                <button onclick="formatDoc('foreColor', 'green')" style="color:green">A</button>
+                <button onclick="formatDoc('removeFormat')" title="Rimuovi stile">🧽</button>
+            </div>
+            
+            <div id="editor" contenteditable="true" placeholder="Scrivi qui..."></div>
+            
+            <button onclick="addCircolare()" style="margin-top:10px; width:100%;">Pubblica Circolare</button>
         </div>
 
         <div id="lista-circolari">
@@ -77,11 +113,11 @@
 </div>
 
 <script type="module">
-    // Importiamo le funzioni necessarie
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-    import { getDatabase, ref, push, onValue, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+    // Nota: aggiunto 'remove' alle importazioni
+    import { getDatabase, ref, push, onValue, update, remove } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
-    // --- CONFIGURAZIONE FIREBASE (I TUOI DATI) ---
+    // --- TUA CONFIGURAZIONE FIREBASE ---
     const firebaseConfig = {
         apiKey: "AIzaSyDSJItcfmcwhmnmZ8YxmgBVdpCzPfKmHTQ",
         authDomain: "circolari-online-docenti.firebaseapp.com",
@@ -99,13 +135,18 @@
     // Variabili Globali
     let currentUser = localStorage.getItem('school_user') || "";
     let isAdmin = false;
-    const ADMIN_PASS = "scuola2024"; // ⚠️ PASSWORD DEMO (Modificala se vuoi)
+    const ADMIN_PASS = "scuola2024"; 
 
-    // Funzioni esposte globalmente
+    // --- FUNZIONI EDITOR DI TESTO ---
+    window.formatDoc = function(cmd, value) {
+        document.execCommand(cmd, false, value);
+        document.getElementById('editor').focus(); // Mantiene il focus sull'editor
+    };
+
+    // --- FUNZIONI DI LOGIN ---
     window.login = function() {
         const input = document.getElementById('usernameInput').value.trim();
         if(input) {
-            // "Sanitizza" lo username (sostituisce caratteri non validi per Firebase)
             currentUser = input.replace(/[.#$/[\]]/g, "_"); 
             localStorage.setItem('school_user', currentUser);
             showInterface();
@@ -152,29 +193,43 @@
 
     // --- LOGICA DATABASE ---
 
-    // 1. Aggiungi Circolare (Solo Admin)
+    // 1. Aggiungi Circolare (Prende HTML dall'editor)
     window.addCircolare = function() {
-        const text = document.getElementById('newCircolareText').value;
-        if(!text) return;
+        const htmlContent = document.getElementById('editor').innerHTML;
+        // Controllo semplice per vedere se è vuoto (o contiene solo <br>)
+        if(htmlContent.trim() === "" || htmlContent === "<br>") {
+            alert("Scrivi qualcosa!");
+            return;
+        }
 
         const circolariRef = ref(db, 'circolari');
         const newCircolare = {
-            testo: text,
+            testo: htmlContent, // Salviamo HTML con colori e grassetto
             data: new Date().toLocaleDateString('it-IT') + " " + new Date().toLocaleTimeString('it-IT'),
             autore: "Presidenza"
         };
         push(circolariRef, newCircolare);
-        document.getElementById('newCircolareText').value = ""; // Pulisci campo
+        document.getElementById('editor').innerHTML = ""; // Pulisci editor
         alert("Circolare pubblicata!");
     };
 
-    // 2. Carica e Mostra Circolari
+    // 2. Elimina Circolare
+    window.deleteCircolare = function(id) {
+        if(confirm("Sei sicuro di voler ELIMINARE definitivamente questa circolare e tutte le conferme di lettura?")) {
+            const circolareRef = ref(db, 'circolari/' + id);
+            remove(circolareRef)
+                .then(() => alert("Circolare eliminata."))
+                .catch((error) => alert("Errore: " + error.message));
+        }
+    };
+
+    // 3. Carica e Mostra Circolari
     function loadCircolari() {
         const circolariRef = ref(db, 'circolari');
         
         onValue(circolariRef, (snapshot) => {
             const list = document.getElementById('lista-circolari');
-            list.innerHTML = ""; // Pulisci lista
+            list.innerHTML = ""; 
             const data = snapshot.val();
 
             if(!data) {
@@ -182,23 +237,21 @@
                 return;
             }
 
-            // Trasforma oggetto in array e inverti ordine (più recenti in alto)
             const entries = Object.entries(data).reverse(); 
 
             entries.forEach(([id, circolare]) => {
                 const div = document.createElement('div');
                 div.className = "circolare";
 
-                // Controlla se l'utente attuale ha letto questa circolare
                 const hasRead = circolare.letture && circolare.letture[currentUser];
                 
-                // HTML Base della circolare
-                let htmlContent = `
-                    <div class="meta-info">${circolare.data}</div>
-                    <span class="circolare-text">${circolare.testo}</span>
-                `;
+                // Intestazione con Data
+                let htmlContent = `<div class="meta-info">Pubblicato il: ${circolare.data}</div>`;
 
-                // SE SEI UTENTE STANDARD: Mostra Checkbox
+                // Contenuto Circolare (renderizza l'HTML colorato)
+                htmlContent += `<div class="circolare-content">${circolare.testo}</div>`;
+
+                // LOGICA UTENTE: Checkbox
                 if(!isAdmin) {
                     htmlContent += `
                         <label class="check-container">
@@ -212,14 +265,23 @@
                     `;
                 }
 
-                // SE SEI ADMIN: Mostra chi ha letto
+                // LOGICA ADMIN: Lista lettori + Tasto Elimina
                 if(isAdmin) {
                     let readers = "Nessuno ha ancora letto.";
+                    let count = 0;
                     if(circolare.letture) {
-                        // Prendi le chiavi (i nomi utente) dell'oggetto letture
-                        readers = "<b>Letto da:</b> " + Object.keys(circolare.letture).join(", ");
+                        const names = Object.keys(circolare.letture);
+                        count = names.length;
+                        readers = `<b>Letto da (${count}):</b> ` + names.join(", ");
                     }
-                    htmlContent += `<div class="reader-list">${readers}</div>`;
+                    
+                    htmlContent += `
+                        <div class="reader-list">
+                            ${readers}
+                            <br><br>
+                            <button class="delete-btn" onclick="deleteCircolare('${id}')">🗑 Elimina Circolare</button>
+                        </div>
+                    `;
                 }
 
                 div.innerHTML = htmlContent;
@@ -228,20 +290,14 @@
         });
     }
 
-    // 3. Segna come letto
+    // 4. Segna come letto
     window.markAsRead = function(circolareId) {
-        // Scriviamo nel DB: circolari/ID/letture/NOME_UTENTE = true
         const updates = {};
         updates[`circolari/${circolareId}/letture/${currentUser}`] = true;
-        
-        update(ref(db), updates).then(() => {
-            // Successo
-        }).catch((error) => {
-            alert("Errore nel salvataggio: " + error.message);
-        });
+        update(ref(db), updates);
     }
 
-    // Controllo se c'è già un login salvato (Auto-login utente)
+    // Auto-login
     if(localStorage.getItem('school_user')) {
         currentUser = localStorage.getItem('school_user');
         showInterface();
