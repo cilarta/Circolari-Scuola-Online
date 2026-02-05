@@ -26,20 +26,34 @@
             transition: all 0.3s ease; /* Animazione fluida */
         }
 
-        /* STILE PER CIRCOLARI GIÀ LETTE */
+        /* STILE PER CIRCOLARI GIÀ LETTE (MODIFICATO: Molto più piccolo) */
         .circolare-letta {
-            opacity: 0.6;           /* Diventa semi-trasparente */
-            font-size: 0.85em;      /* Diventa più piccola */
-            background-color: #f0f0f0; /* Sfondo grigino */
-            border: 1px solid #ddd;
+            opacity: 0.5;              /* Molto trasparente */
+            font-size: 0.7em;          /* Carattere molto piccolo */
+            background-color: #f9f9f9; /* Sfondo quasi bianco */
+            border: 1px solid #eee;
+            padding: 8px;              /* Meno spazio interno */
+        }
+        
+        /* Quando è letta, nascondiamo anche un po' di margine del testo interno */
+        .circolare-letta .circolare-content {
+            margin-bottom: 2px;
         }
 
         .circolare-content { font-size: 1.1em; margin-bottom: 10px; display: block; margin-top: 5px; }
+        
+        /* Correzione per il testo interno quando rimpicciolito */
+        .circolare-letta .circolare-content { font-size: 1em; } 
+
         .meta-info { font-size: 0.8em; color: #888; margin-bottom: 5px; }
         
         /* Checkbox */
         .check-container { display: flex; align-items: center; cursor: pointer; margin-top: 10px;}
         .check-container input { margin-right: 10px; transform: scale(1.5); }
+        
+        /* Scaliamo la checkbox se la circolare è letta per non farla sembrare gigante */
+        .circolare-letta .check-container input { transform: scale(1.0); }
+
         .read-confirm { color: green; font-weight: bold; display: none; margin-left: 10px;}
         input:checked ~ .read-confirm { display: inline; }
 
