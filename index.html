@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bacheca Circolari</title>
+    <style>
+        body { font-family: sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background-color: #f4f4f9; }
+        .container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #333; }
+        
+        /* Sezione Login */
+        #login-section, #admin-login-section { text-align: center; margin-bottom: 20px; padding: 20px; border: 1px solid #ddd; border-radius: 8px; }
+        input[type="text"], input[type="password"] { padding: 10px; width: 70%; margin-bottom: 10px; }
+        button { padding: 10px 20px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background-color: #0056b3; }
+        .admin-btn { background-color: #6c757d; margin-top: 10px; font-size: 0.8em; }
+
+        /* Lista Circolari */
+        .circolare { border-bottom: 1px solid #eee; padding: 15px 0; }
+        .circolare-text { font-size: 1.1em; margin-bottom: 10px; display: block; font-weight: bold; }
+        .meta-info { font-size: 0.8em; color: #888; margin-bottom: 5px; }
+        
+        /* Checkbox */
+        .check-container { display: flex; align-items: center; cursor: pointer; }
+        .check-container input { margin-right: 10px; transform: scale(1.5); }
+        .read-confirm { color: green; font-weight: bold; display: none; margin-left: 10px;}
+        input:checked ~ .read-confirm { display: inline; }
+
+        /* Admin Panel */
+        #admin-panel { border: 2px solid #dc3545; padding: 15px; margin-bottom: 20px; background-color: #fff8f8; display: none; }
+        #admin-panel h3 { color: #dc3545; margin-top: 0; }
+        textarea { width: 100%; height: 80px; padding: 10px; margin-bottom: 10px; }
+        .reader-list { font-size: 0.8em; color: #555; background: #eee; padding: 10px; margin-top: 5px; border-radius: 4px; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🏫 Bacheca Circolari</h1>
+
+    <div id="login-section">
+        <h3>Chi sei?</h3>
+        <input type="text" id="usernameInput" placeholder="Inserisci il tuo Nome e Cognome (es. Mario Rossi)">
+        <br>
+        <button onclick="login()">Entra</button>
+        <br>
+        <button class="admin-btn" onclick="showAdminLogin()">Area Amministratore</button>
+    </div>
+
+    <div id="admin-login-section" class="hidden">
+        <h3>Accesso Amministratore</h3>
+        <input type="password" id="adminPasswordInput" placeholder="Password Admin">
+        <br>
+        <button onclick="adminLogin()">Sblocca</button>
+        <button class="admin-btn" onclick="hideAdminLogin()">Torna indietro</button>
+    </div>
+
+    <div id="main-interface" class="hidden">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <p>Ciao, <b id="currentUserDisplay"></b></p>
+            <button onclick="logout()" style="background:#dc3545; padding: 5px 10px;">Esci</button>
+        </div>
+        <hr>
+
+        <div id="admin-panel">
+            <h3>🛠 Aggiungi Nuova Circolare</h3>
+            <textarea id="newCircolareText" placeholder="Scrivi qui il testo della circolare..."></textarea>
+            <button onclick="addCircolare()">Pubblica Circolare</button>
+        </div>
+
+        <div id="lista-circolari">
+            <p>Caricamento circolari in corso...</p>
+        </div>
+    </div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getDatabase, ref, push, onValue, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+    // --- CONFIGURAZIONE FIREBASE ---
+<script type="module">
+  // Import the functions you need from the SDKs you need
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.8.0/firebase-app.js";
+  // TODO: Add SDKs for Firebase products that you want to use
+  // https://firebase.google.com/docs/web/setup#available-libraries
+
+  // Your web app's Firebase configuration
+  const firebaseConfig = {
+    apiKey: "AIzaSyDSJItcfmcwhmnmZ8YxmgBVdpCzPfKmHTQ",
+    authDomain: "circolari-online-docenti.firebaseapp.com",
+    databaseURL: "https://circolari-online-docenti-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "circolari-online-docenti",
+    storageBucket: "circolari-online-docenti.firebasestorage.app",
+    messagingSenderId: "692753452418",
+    appId: "1:692753452418:web:15a59bf3edef2c7e26d39b"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+</script>
+    };
+
+    // Inizializza Firebase
+    const app = initializeApp(firebaseConfig);
+    const db = getDatabase(app);
+
+    // Variabili Globali
+    let currentUser = localStorage.getItem('school_user') || "";
+    let isAdmin = false;
+    const ADMIN_PASS = "scuola2024"; // ⚠️ PASSWORD SEMPLICE PER LA DEMO
+
+    // Funzioni esposte globalmente (per i button onclick)
+    window.login = function() {
+        const input = document.getElementById('usernameInput').value.trim();
+        if(input) {
+            // "Sanitizza" lo username per poterlo usare come chiave nel DB (rimuove caratteri speciali)
+            currentUser = input.replace(/[.#$/[\]]/g, "_"); 
+            localStorage.setItem('school_user', currentUser);
+            showInterface();
+        } else {
+            alert("Inserisci un nome!");
+        }
+    };
+
+    window.logout = function() {
+        localStorage.removeItem('school_user');
+        location.reload();
+    };
+
+    window.showAdminLogin = function() {
+        document.getElementById('login-section').classList.add('hidden');
+        document.getElementById('admin-login-section').classList.remove('hidden');
+    };
+
+    window.hideAdminLogin = function() {
+        document.getElementById('admin-login-section').classList.add('hidden');
+        document.getElementById('login-section').classList.remove('hidden');
+    };
+
+    window.adminLogin = function() {
+        const pass = document.getElementById('adminPasswordInput').value;
+        if(pass === ADMIN_PASS) {
+            isAdmin = true;
+            currentUser = "AMMINISTRATORE"; 
+            showInterface();
+            document.getElementById('admin-panel').style.display = "block";
+        } else {
+            alert("Password errata");
+        }
+    };
+
+    function showInterface() {
+        document.getElementById('login-section').classList.add('hidden');
+        document.getElementById('admin-login-section').classList.add('hidden');
+        document.getElementById('main-interface').classList.remove('hidden');
+        document.getElementById('currentUserDisplay').innerText = currentUser;
+        
+        loadCircolari();
+    }
+
+    // --- LOGICA DATABASE ---
+
+    // 1. Aggiungi Circolare (Solo Admin)
+    window.addCircolare = function() {
+        const text = document.getElementById('newCircolareText').value;
+        if(!text) return;
+
+        const circolariRef = ref(db, 'circolari');
+        const newCircolare = {
+            testo: text,
+            data: new Date().toLocaleDateString('it-IT') + " " + new Date().toLocaleTimeString('it-IT'),
+            autore: "Presidenza"
+        };
+        push(circolariRef, newCircolare);
+        document.getElementById('newCircolareText').value = ""; // Pulisci campo
+        alert("Circolare pubblicata!");
+    };
+
+    // 2. Carica e Mostra Circolari
+    function loadCircolari() {
+        const circolariRef = ref(db, 'circolari');
+        
+        onValue(circolariRef, (snapshot) => {
+            const list = document.getElementById('lista-circolari');
+            list.innerHTML = ""; // Pulisci lista
+            const data = snapshot.val();
+
+            if(!data) {
+                list.innerHTML = "<p>Nessuna circolare presente.</p>";
+                return;
+            }
+
+            // Trasforma oggetto in array e inverti ordine (più recenti in alto)
+            const entries = Object.entries(data).reverse(); 
+
+            entries.forEach(([id, circolare]) => {
+                const div = document.createElement('div');
+                div.className = "circolare";
+
+                // Controlla se l'utente attuale ha letto questa circolare
+                const hasRead = circolare.letture && circolare.letture[currentUser];
+                
+                // HTML Base della circolare
+                let htmlContent = `
+                    <div class="meta-info">${circolare.data}</div>
+                    <span class="circolare-text">${circolare.testo}</span>
+                `;
+
+                // SE SEI UTENTE STANDARD: Mostra Checkbox
+                if(!isAdmin) {
+                    htmlContent += `
+                        <label class="check-container">
+                            <input type="checkbox" 
+                                   id="chk_${id}" 
+                                   ${hasRead ? "checked disabled" : ""} 
+                                   onchange="markAsRead('${id}')">
+                            <span>Ho letto</span>
+                            <span class="read-confirm"> (Confermato)</span>
+                        </label>
+                    `;
+                }
+
+                // SE SEI ADMIN: Mostra chi ha letto
+                if(isAdmin) {
+                    let readers = "Nessuno ha ancora letto.";
+                    if(circolare.letture) {
+                        // Prendi le chiavi (i nomi utente) dell'oggetto letture
+                        readers = "<b>Letto da:</b> " + Object.keys(circolare.letture).join(", ");
+                    }
+                    htmlContent += `<div class="reader-list">${readers}</div>`;
+                }
+
+                div.innerHTML = htmlContent;
+                list.appendChild(div);
+            });
+        });
+    }
+
+    // 3. Segna come letto
+    window.markAsRead = function(circolareId) {
+        // Scriviamo nel DB: circolari/ID/letture/NOME_UTENTE = true
+        const updates = {};
+        updates[`circolari/${circolareId}/letture/${currentUser}`] = true;
+        
+        update(ref(db), updates).then(() => {
+            // Opzionale: feedback visivo immediato gestito già dal listener onValue
+        }).catch((error) => {
+            alert("Errore nel salvataggio: " + error.message);
+        });
+    }
+
+    // Controllo se c'è già un login salvato (Auto-login utente)
+    if(localStorage.getItem('school_user')) {
+        currentUser = localStorage.getItem('school_user');
+        showInterface();
+    }
+</script>
+
+</body>
+</html>
